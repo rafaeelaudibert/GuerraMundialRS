@@ -1,0 +1,12 @@
+# Shapefile files
+*.shp
+*.xml
+*.shx
+*.dbf
+*.sbn
+*.prj
+*.cpg
+*.sbx
+
+# Python notebook cache
+.ipynb_checkpoints/*
