@@ -89,9 +89,10 @@ df = read_shapefile(sf)
 # Precompute the distances
 DISTANCES = {}
 
-for city_name in df['nome']:
-    print("Pre-Computing distance to {}".format(city_name))
-    DISTANCES[city_name] = distance_to_other_cities(df, city_name)
+with tqdm(df['nome']) as t:
+    for city_name in t:
+        t.set_description(city_name)
+        DISTANCES[city_name] = distance_to_other_cities(df, city_name)
 
 winners = {}
 time = []
