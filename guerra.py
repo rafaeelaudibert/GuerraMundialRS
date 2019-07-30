@@ -92,18 +92,24 @@ df = read_shapefile(sf)
 DISTANCES = {}
 
 if os.path.isfile('./distances.json'):
+    print("Fetching distances from cached file")
     with open('./distances.json', 'r') as f:
         DISTANCES = json.load(f)
 else:
+    print("Computing distances")
     with tqdm(df['nome']) as t:
         for city_name in t:
             t.set_description(city_name)
             DISTANCES[city_name] = distance_to_other_cities(df, city_name)
 
     # Write the distances to a file
+    print("Writing distances to cache file")
     with open('distances.json', 'w') as f:
         json.dump(DISTANCES, f)
 
+
+# Run simulation for many steps, keeping track of some stuff
+print("Running simulation for some steps")
 winners = {}
 time = []
 for i in tqdm(range(10000)):
