@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from math import radians, cos, sin, asin, sqrt
 from tqdm import tqdm
+import json
 
 sns.set(style='whitegrid', palette='pastel', color_codes=True)
 sns.mpl.rc('figure', figsize=(10, 6))
@@ -144,6 +145,14 @@ for i in tqdm(range(10000)):
     winners[winner_name] = winners[winner_name] + \
         1 if winner_name in winners else 1
     time.append(len(runners))
+
+    # Update the time file
+    with open('time.json', 'w') as f:
+        json.dump({"time": time, "mean": np.mean(time)}, f)
+
+    # Update the winners file
+    with open('winners.json', 'w') as f:
+        json.dump(winners, f)
 
 
 # Average of time to run
