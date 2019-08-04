@@ -10,3 +10,12 @@
 
 # Python notebook cache
 .ipynb_checkpoints/*
+
+# Figures generated
+figures/*.jpg
+
+# Cache files
+**/*.pyc
+
+# JSON files
+*.json
