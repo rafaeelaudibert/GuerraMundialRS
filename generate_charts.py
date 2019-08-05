@@ -319,10 +319,9 @@ counter = max([0] + [int(f.split('\\')[-1].split('.')[0].split('_')[-1]) for f i
 
 # Run the code
 while len(df.owner.unique()) > 1:
-    counter += 1
-
     # Run the attacks
     attacks = run()
+    counter += len(attacks)
 
     # Plot the map
     fig, ax = plot_map(df, figsize=(15, 12), attack=attacks[-1], fontsize=9)
