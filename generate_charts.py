@@ -116,13 +116,13 @@ def distance_to_other_cities(df, city):
     return sorted(distance, key=lambda x: x[0])
 
 
-def plot_city(df, city_name, color='w', print_text=False, **kwargs):
+def plot_city(df, city_name, color='w', print_text=False, city_linewidth=0.03, **kwargs):
     """ Plots a single shape """
 
     # Fetch and plot the shape with its contour
     x_lon, y_lat = get_city_coordinates(df, city_name)
-    plt.plot(x_lon, y_lat, 'w', linewidth=0.03, zorder=-1)
     plt.fill(x_lon, y_lat, facecolor=color, zorder=-2)
+    plt.plot(x_lon, y_lat, 'w', linewidth=city_linewidth)
     
 
     # Configure the text plotting
@@ -167,7 +167,7 @@ def plot_arrow(a, b, crossed=False, **kwargs):
                      color='k',
                      **kwargs)
 
-def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, **kwargs):
+def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, city_linewidth=0.03, **kwargs):
     '''
     Plot map with lim coordinates, and the cities asked with their correspondent color
     '''
@@ -180,11 +180,15 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, **kwar
         owner = df[df['nome'] == owner_name].iloc[0]
         owned_by = df[df['owner'] == owner_name]
         for index, row in owned_by.iterrows():
-            plot_city(df, row.nome, owner.color, **kwargs)
+            plot_city(df, row.nome, owner.color, city_linewidth=city_linewidth, **kwargs)
     gc.collect() # Call Garbage Collector explicitly
 
+    # Configure the map size
+    if (x_lim != None) and (y_lim != None):
+        plt.xlim(x_lim)
+        plt.ylim(y_lim)
+
     # Plot texts
-    texts_bb = []
     owners = df.owner.unique()
     np.random.shuffle(owners) # Shuffle in place
 
@@ -197,6 +201,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, **kwar
         if city in owners:
             owners = np.concatenate(([city], owners))
 
+    texts_bb = []
     for owner_name in owners:
         owned_by = df[df['owner'] == owner_name]
         x_center, y_center = np.mean(
@@ -221,10 +226,6 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, **kwar
     if attack != None:
         arrow = plot_arrow(attack['attack'], attack['defend'], crossed=not attack['success'], alpha=0.8, zorder=100)
 
-    # Configure the map size
-    if (x_lim != None) and (y_lim != None):
-        plt.xlim(x_lim)
-        plt.ylim(y_lim)
 
     return fig, ax
 
@@ -268,7 +269,9 @@ def run(*, times=1):
                 print("{} tried to conquer {} from {} through {}, but failed".format(attack_city_owner.nome.to_numpy()[
                     0], defend_name, defend_city_owner.nome.to_numpy()[0], attack_name))
 
-                cities.append({"attack": attack_name, "defend": defend_name, 'success': False})
+                cities.append({'attack': attack_city_owner.nome.to_numpy()[0],
+                               'defend': defend_city_owner.nome.to_numpy()[0],
+                               'success': False})
             else:
                 # Print information
                 print("{} conquers {} from {} through {}".format(attack_city_owner.nome.to_numpy()[
@@ -278,7 +281,9 @@ def run(*, times=1):
                 df.loc[df['nome'] == defend_name, ['owner']] = attack_city_owner.nome.to_numpy()[
                     0]
 
-                cities.append({"attack": attack_name, "defend": defend_name, 'success': True})
+                cities.append({'attack': attack_city_owner.nome.to_numpy()[0],
+                               'defend': defend_city_owner.nome.to_numpy()[0],
+                               'success': True})
             
             # Decrease protectedness
             df.loc[df['protected'] > 0, ['protected']] = df[df['protected'] > 0].protected - 1
@@ -310,7 +315,7 @@ else:
 
 # Get the current iteration number
 basepath = './figures'
-counter = max([0] + [int(f.split('\\')[-1].split('.')[0]) for f in glob.glob(basepath + "/*.jpg")])
+counter = max([0] + [int(f.split('\\')[-1].split('.')[0].split('_')[-1]) for f in glob.glob(basepath + "/*.jpg")])
 
 # Run the code
 while len(df.owner.unique()) > 1:
@@ -334,6 +339,36 @@ while len(df.owner.unique()) > 1:
     # Save figure
     plt.savefig("{}/{}.jpg".format(basepath, counter), dpi=200)
     print("Saved figure to {}/{}.jpg".format(basepath, counter))
+    plt.close()
+
+    # Plot the zoomed map
+    x_lim, y_lim = (float("inf"), float("-inf")), (float("inf"), float("-inf"))
+    for city_name in df[(df.owner == attacks[-1]['attack']) | (df.owner == attacks[-1]['defend'])].nome:
+        coord_x, coord_y = get_city_coordinates(df, city_name)
+        x_lim = (min([x_lim[0]] + coord_x), max([x_lim[1]] + coord_x))
+        y_lim = (min([y_lim[0]] + coord_y), max([y_lim[1]] + coord_y))
+    x_lim = (x_lim[0] - 0.02, x_lim[1] + 0.02)
+    y_lim = (y_lim[0] - 0.02, y_lim[1] + 0.02)
+    fig, ax = plot_map(df,
+                       figsize=(15, 12),
+                       attack=attacks[-1],
+                       fontsize=30,
+                       city_linewidth=4.,
+                       x_lim=x_lim,
+                       y_lim=y_lim)
+
+    # Call Garbage Collector explicitly
+    gc.collect()
+
+    # Remove axis, ticks and remove padding
+    sns.despine(top=True, right=True, left=True, bottom=True)
+    fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
+    ax.set_yticks([])
+    ax.set_xticks([])
+
+    # Save figure
+    plt.savefig("{}/zoom_{}.jpg".format(basepath, counter), dpi=200)
+    print("Saved figure to {}/zoom_{}.jpg".format(basepath, counter))
     plt.close()
 
     # Call Garbage Collector explicitly
