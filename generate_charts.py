@@ -10,13 +10,10 @@ import os
 import json
 import gc
 from pprint import pprint as pp
+import glob
 
 sns.set(style='white', palette='pastel', color_codes=True)
 sns.mpl.rc('figure', figsize=(10, 6))
-
-shp_path = "./Municipio.shp"
-sf = shp.Reader(shp_path)
-
 
 def read_shapefile(sf):
     """
@@ -24,13 +21,29 @@ def read_shapefile(sf):
     column holding the geometry information. This uses the pyshp
     package
     """
-    df = pd.DataFrame(columns=[x[0] for x in sf.fields][1:], data=sf.records())
-    df = df.assign(coords=[s.points for s in sf.shapes()])
-    df = df.assign(owner=df.nome)
-    df = df.assign(centre=[get_city_centre(df, city_name)
-                           for city_name in df['nome']])
-    df = df.assign(color=[np.random.rand(3,) / 2 +
-                          0.5 for city_name in df['nome']])    
+
+    print("Generating Dataframe")
+    if os.path.isfile('./dataframe.h5'):
+        print("Reading Dataframe from HDF5")
+        df = pd.read_hdf('./dataframe.h5')
+    else:
+        df = pd.DataFrame(columns=[x[0] for x in sf.fields][1:], data=sf.records())
+        df = df.assign(coords=[s.points for s in sf.shapes()])
+        df = df.assign(owner=df.nome)
+        df = df.assign(centre=[get_city_centre(df, city_name)
+                            for city_name in df['nome']])
+        df = df.assign(color=[np.random.rand(3,) / 2 +
+                            0.5 for city_name in df['nome']])
+        df = df.assign(protected=[int(np.random.rand() * 10) for city_name in df['nome']])
+
+        # Save to H5
+        df.to_hdf('./dataframe.h5', 'df')
+
+    # If already run, update the fields
+    if os.path.isfile('./dataframe.json'):
+        print("Reading owner and protected from JSON file")
+        df.update(pd.read_json('./dataframe.json', orient='records'))
+    
     return df
 
 
@@ -89,9 +102,11 @@ def distance_to_other_cities(df, city):
 def plot_city(df, city_name, color='w', print_text=False, **kwargs):
     """ Plots a single shape """
 
-    # Fetch and plot the shape
+    # Fetch and plot the shape with its contour
     x_lon, y_lat = get_city_coordinates(df, city_name)
-    plt.fill(x_lon, y_lat, facecolor=color)
+    plt.plot(x_lon, y_lat, 'w', linewidth=0.03, zorder=-1)
+    plt.fill(x_lon, y_lat, facecolor=color, zorder=-2)
+    
 
     # Configure the text plotting
     if print_text:
@@ -102,13 +117,18 @@ def plot_city(df, city_name, color='w', print_text=False, **kwargs):
 
 def sizeof_fmt(num, suffix='B'):
     ''' By Fred Cirera, after https://stackoverflow.com/a/1094933/1870254'''
+
     for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
         if abs(num) < 1024.0:
             return "%3.1f%s%s" % (num, unit, suffix)
         num /= 1024.0
     return "%.1f%s%s" % (num, 'Yi', suffix)
 
-def plot_arrow(a, b, **kwargs):
+def plot_arrow(a, b, crossed=False, **kwargs):
+    '''
+    Plot an arrow from city A to city B
+    '''
+
     start = get_city_centre(df, a)
     end = get_city_centre(df, b)
 
@@ -116,6 +136,11 @@ def plot_arrow(a, b, **kwargs):
     y = start[1]
     dx = end[0] - x
     dy = end[1] - y
+
+    # Draw an 'X' in the arrow, if crossed
+    if crossed:
+        plt.text(x + dx/2, y + dy/2, 'X', va='center', ha='center', fontsize=8) \
+           .set_path_effects([PathEffects.withStroke(linewidth=2, foreground='w')])
 
     return plt.arrow(x, y,
                      (dx - 0.007) if dx > 0 else (dx + 0.007),
@@ -133,13 +158,6 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, **kwar
     # Configure the plot
     fig, ax = plt.subplots(figsize=figsize)
 
-    # Plot all the cities in the map
-    for shape in df.coords:
-        ax.plot([point[0] for point in shape],
-                [point[1] for point in shape],
-                'w', linewidth=0.03)
-    gc.collect() # Call Garbage Collector explicitly  
-    
     # Plot the cities
     for owner_name in df.owner.unique():
         owner = df[df['nome'] == owner_name].iloc[0]
@@ -180,48 +198,23 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, **kwar
                 break
         else:
             texts_bb.append(bb_transformed)
-    # print("Took {} iterations to adjust_text".format(adjust_text(texts, force_text=(0.2, 0.2), lim=1, arrowprops=dict(arrowstyle='-', color='gray', alpha=0.5))))
-
+    
     # Plot arrow for attack
     arrow = None
     if attack != None:
-        arrow = plot_arrow(attack['attack'], attack['defend'], alpha=0.8, zorder=100)
+        arrow = plot_arrow(attack['attack'], attack['defend'], crossed=not attack['success'], alpha=0.8, zorder=100)
 
     # Configure the map size
     if (x_lim != None) and (y_lim != None):
         plt.xlim(x_lim)
         plt.ylim(y_lim)
 
-    # plt.axes().set_aspect('scaled')
-
     return fig, ax
 
-
-# RUN CHART GENERATION
-df = read_shapefile(sf)
-DISTANCES = {}
-
-# Precompute the distances
-if os.path.isfile('./distances.json'):
-    print("Fetching distances from cached file")
-    with open('./distances.json', 'r') as f:
-        DISTANCES = json.load(f)
-else:
-    print("Computing distances")
-    with tqdm(df['nome']) as t:
-        for city_name in t:
-            t.set_description(city_name)
-            DISTANCES[city_name] = distance_to_other_cities(df, city_name)
-
-    # Write the distances to a file
-    print("Writing distances to cache file")
-    with open('distances.json', 'w') as f:
-        json.dump(DISTANCES, f)
-
-# Run function
-
-
 def run(*, times=1):
+    '''
+    Run function
+    '''
     cities = []
 
     for i in range(times):
@@ -252,29 +245,86 @@ def run(*, times=1):
             # Get its owner
             defend_city_owner = df[df.nome == defend_city.owner.to_numpy()[0]]
 
-            # Print information
-            print("{} conquers {} from {} through {}".format(attack_city_owner.nome.to_numpy()[
-                  0], defend_name, defend_city_owner.nome.to_numpy()[0], attack_name))
+            # Check city protection
+            if defend_city.protected.to_numpy()[0] > 0:
+                # Print information
+                print("{} tried to conquer {} from {} through {}, but failed".format(attack_city_owner.nome.to_numpy()[
+                    0], defend_name, defend_city_owner.nome.to_numpy()[0], attack_name))
 
-            # Update the city owner
-            df.loc[df['nome'] == defend_name, ['owner']] = attack_city_owner.nome.to_numpy()[
-                0]
+                cities.append({"attack": attack_name, "defend": defend_name, 'success': False})
+            else:
+                # Print information
+                print("{} conquers {} from {} through {}".format(attack_city_owner.nome.to_numpy()[
+                    0], defend_name, defend_city_owner.nome.to_numpy()[0], attack_name))
 
-            cities.append({"attack": attack_name, "defend": defend_name})
+                # Update the city owner
+                df.loc[df['nome'] == defend_name, ['owner']] = attack_city_owner.nome.to_numpy()[
+                    0]
 
+                cities.append({"attack": attack_name, "defend": defend_name, 'success': True})
+            
+            # Decrease protectedness
+            df.loc[df['protected'] > 0, ['protected']] = df[df['protected'] > 0].protected - 1
     return cities
 
-counter = 0
+
+### CHART GENERATION ###
+
+# Read the dataframe
+df = read_shapefile(shp.Reader("./Municipio.shp"))
+
+# Precompute the distances
+DISTANCES = {}
+if os.path.isfile('./distances.json'):
+    print("Fetching distances from cached file")
+    with open('./distances.json', 'r') as f:
+        DISTANCES = json.load(f)
+else:
+    print("Computing distances")
+    with tqdm(df['nome']) as t:
+        for city_name in t:
+            t.set_description(city_name)
+            DISTANCES[city_name] = distance_to_other_cities(df, city_name)
+
+    # Write the distances to a file
+    print("Writing distances to cache file")
+    with open('distances.json', 'w') as f:
+        json.dump(DISTANCES, f)
+
+# Get the current iteration number
 basepath = './figures'
+counter = max([0] + [int(f.split('\\')[-1].split('.')[0]) for f in glob.glob(basepath + "/*.jpg")])
+
+# Run the code
 while len(df.owner.unique()) > 1:
     counter += 1
+
+    # Run the attacks
     attacks = run()
+
+    # Plot the map
     fig, ax = plot_map(df, figsize=(15, 12), attack=attacks[-1], fontsize=9)
+
+    # Call Garbage Collector explicitly
+    gc.collect()
+
+    # Remove axis, ticks and remove padding
     sns.despine(top=True, right=True, left=True, bottom=True)
+    fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
     ax.set_yticks([])
     ax.set_xticks([])
+
+    # Save figure
     plt.savefig("{}/{}.jpg".format(basepath, counter), dpi=200)
     print("Saved figure to {}/{}.jpg".format(basepath, counter))
-    exit()
     plt.close()
-    gc.collect() # Call Garbage Collector explicitly
+
+    # Call Garbage Collector explicitly
+    gc.collect()
+    
+    # Update Dataframe HDF5 file
+    print("Saving Updatable Dataframe Information to JSON")
+    df[['nome', 'owner', 'protected']].to_json('./dataframe.json', orient='records') # Save to HDF5
+    
+    # Call Garbage Collector explicitly
+    gc.collect()
