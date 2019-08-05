@@ -58,14 +58,31 @@ def get_city_coordinates(df, city_name):
 
     return x_lon, y_lat
 
-
 def get_city_centre(df, city_name):
     """
     From a city_name, return its center coordinates
     """
 
+    # Fetch city coordinates
+    coord_x, coord_y = get_city_coordinates(df, city_name)
+
+    # Compute signed area
+    A = 0
+    for i in range(len(coord_x)):
+        A += coord_x[i] * coord_y[(i + 1) % len(coord_y)] - coord_x[(i + 1) % len(coord_x)] * coord_y[i]
+    A /= 2
+
+    # Compute C_x
+    C_x = 0
+    C_y = 0
+    for i in range(len(coord_x)):
+        C_x += (coord_x[i] + coord_x[(i + 1) % len(coord_x)]) * (coord_x[i] * coord_y[(i + 1) % len(coord_y)] - coord_x[(i + 1) % len(coord_x)] * coord_y[i])
+        C_y += (coord_y[i] + coord_y[(i + 1) % len(coord_x)]) * (coord_x[i] * coord_y[(i + 1) % len(coord_y)] - coord_x[(i + 1) % len(coord_x)] * coord_y[i])
+    C_x /= 6 * A
+    C_y /= 6 * A
+
     # Fetch the shape information
-    return np.mean(get_city_coordinates(df, city_name), 1)
+    return C_x, C_y
 
 
 def haversine_distance(x0, y0, x1, y1):
