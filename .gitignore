@@ -17,5 +17,6 @@ figures/*.jpg
 # Cache files
 **/*.pyc
 
-# JSON files
+# JSON and HDF5 files
 *.json
+*.h5
