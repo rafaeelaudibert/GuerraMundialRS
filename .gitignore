@@ -20,3 +20,9 @@ figures/*.jpg
 # JSON and HDF5 files
 *.json
 *.h5
+
+# Exe files
+*.exe
+
+# Env files
+.env
