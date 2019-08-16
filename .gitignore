@@ -11,8 +11,9 @@
 # Python notebook cache
 .ipynb_checkpoints/*
 
-# Figures generated
-figures/*.jpg
+# Files generated
+figures/**/*.jpg
+figures/**/*.txt
 
 # Cache files
 **/*.pyc
