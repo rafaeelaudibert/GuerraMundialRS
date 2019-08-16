@@ -20,35 +20,27 @@ from tqdm import tqdm
 sns.set(style='white', palette='pastel', color_codes=True)
 sns.mpl.rc('figure', figsize=(10, 6))
 
-def read_shapefile(sf):
+
+def read_shapefile():
     """
-    Read a shapefile into a Pandas dataframe with a 'coords' 
-    column holding the geometry information. This uses the pyshp
-    package
+    Read a shapefile into a Geopandas dataframe
     """
 
     print("Generating Dataframe")
-    if os.path.isfile('./dataframe.h5'):
-        print("Reading Dataframe from HDF5")
-        df = pd.read_hdf('./dataframe.h5')
-    else:
-        df = pd.DataFrame(columns=[x[0] for x in sf.fields][1:], data=sf.records())
-        df = df.assign(coords=[s.points for s in sf.shapes()])
-        df = df.assign(owner=df.nome)
-        df = df.assign(centre=[get_city_centre(df, city_name)
-                            for city_name in df['nome']])
-        df = df.assign(color=[np.random.rand(3,) / 2 +
-                            0.5 for city_name in df['nome']])
-        df = df.assign(protected=[int(np.random.rand() * 10) for city_name in df['nome']])
+    df = geopandas.read_file('./Municipio.shp')
 
-        # Save to H5
-        df.to_hdf('./dataframe.h5', 'df')
+    if os.path.isfile('./guerra.json'):  # If already ran, update the fields
+        print("Reading owner, color and protected from JSON file")
+        json_df = pd.read_json('./guerra.json', orient='records')
+        df[['owner', 'color', 'protected', 'ranking']] = json_df[[
+            'owner', 'color', 'protected', 'ranking']]
+    else:  # Create new fields
+        print("Configuring owner, color and protected")
+        df['owner'] = df.nome
+        df['color'] = [np.random.rand(3,) / 2 + 0.5 for city_name in df.nome]
+        df['protected'] = [0 for city_name in df['nome']]
+        df['ranking'] = float('nan')
 
-    # If already run, update the fields
-    if os.path.isfile('./dataframe.json'):
-        print("Reading owner and protected from JSON file")
-        df.update(pd.read_json('./dataframe.json', orient='records'))
-    
     return df
 
 
