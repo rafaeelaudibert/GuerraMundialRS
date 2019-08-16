@@ -47,7 +47,7 @@ def read_shapefile():
 
 def haversine_distance(p0, p1):
     """
-    Calculate the great circle distance between two points 
+    Calculate the great circle distance between two points
     on the earth (specified in decimal degrees)
     """
 
@@ -125,7 +125,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack=None, city_lin
                      attack['attack'] if attack is not None else '',
                      attack['defend'] if attack is not None else '']
 
-    for city in ALWAYS_ON_TOP:   
+    for city in ALWAYS_ON_TOP:
         if city in owners:
             owners = np.concatenate(([city], owners))
 
@@ -139,7 +139,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack=None, city_lin
             [PathEffects.withStroke(linewidth=3, foreground='w')])
         bb_transformed = txt.get_window_extent(renderer=fig.canvas.get_renderer()) \
                             .transformed(ax.transData.inverted())
-        
+
         # Check if it is outside of the map
         outside = False
         if (x_lim != None) and (y_lim != None):
@@ -152,13 +152,13 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack=None, city_lin
 
         # Tests interesction if not already outside
         if not outside:
-        for bb in texts_bb:
-            if bb.overlaps(bb_transformed):
-                txt.remove()
-                break
-        else:
-            texts_bb.append(bb_transformed)
-    
+            for bb in texts_bb:
+                if bb.overlaps(bb_transformed):
+                    txt.remove()
+                    break
+            else:
+                texts_bb.append(bb_transformed)
+
     # Plot arrow for attack
     arrow = None
     if attack != None:
@@ -177,7 +177,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack=None, city_lin
             ax.add_collection(collection, autolim=True)
 
         
-
+        
         ax.autoscale_view()
 
     return fig, ax
@@ -244,7 +244,7 @@ def run(*, times=1):
                                'attack_itself': attack_name,
                                'defend_itself': defend_name,
                                'success': True})
-            
+
                 # Verify if need to update ranking
                 if defend_city_owner.nome.to_numpy()[0] not in list(df.owner):
                     print('Adding city to ranking')
@@ -255,11 +255,54 @@ def run(*, times=1):
                    ] = df[df['protected'] > 0].protected - 1
     return cities
 
+def save_text(df, basepath, counter, attack):
+    '''
+        Save the tet for this attack to file
+    '''
+    LOCATIONS = np.array(['a querência de', 'o território de', 'as terras de', 'todos os bois de'])
+    LOCATIONS_FULL = np.array(['A querência de', 'Os soldados de', 'Os peões de', 'A gurizada de'])
+    CONQUER_VERB = np.array(['ataca', 'derruba', 'passa por cima de'])
+    ELIMINATIONS = np.array(['está fora do jogo', 'foi brutalmente eliminado', 'está fora de combate', 'perdeu todos seus territórios', 'foi eliminado', 'tá fora da peleia'])
+
+    # Post text
+    with open("{}/{}/{}.txt".format(basepath, counter, 'post'), 'w') as f:
+        first_line = f"{np.random.choice(LOCATIONS_FULL) if np.random.randint(100) >= 90 else ''} {attack['attack']} {np.random.choice(CONQUER_VERB) if np.random.randint(100) >= 95 else 'conquista'} {attack['defend_itself']}"
+        
+        if attack['defend_itself'] != attack['defend']: # Different defender territory and defender owner
+            first_line += f" {np.random.choice(LOCATIONS) if np.random.randint(100) >= 90 else 'de'} {attack['defend']}"
+        
+        if attack['attack_itself'] != attack['attack']: # Different attacker territory and attacker owner
+            first_line += f" através de {attack['attack_itself']}"
+        
+        first_line += '!\n'
+
+        defend_territories = len(df[df.owner == attack['defend']])
+        second_line = f"{attack['defend']} agora possui {defend_territories} territórios.\n" if defend_territories > 0 else f"{attack['defend']} {np.random.choice(ELIMINATIONS)}.\n"
+
+        attack_territories = len(df[df.owner == attack['attack']])
+        third_line = f"{attack['attack']} agora possui {attack_territories} territórios.\n"
+
+        fourth_line = f"Ainda restam {len(df.owner.unique())} cidades."
+
+        text = first_line + second_line + third_line + '\n\n' + fourth_line
+        f.write(text)
+    
+    # Comment text (ranking)
+    with open("{}/{}/{}.txt".format(basepath, counter, 'comment'), 'w') as f:
+        text = 'Cidades já eliminadas:\n\n'
+        cities = sorted([(city.nome, city.ranking) for idx, city in df[df.ranking.notnull()].iterrows()], key=lambda x: x[1])
+        for name, position in cities:
+            text += f"{int(position)}. {name}\n"
+        f.write(text)
+        
+    return
+
+
 
 ### CHART GENERATION ###
 
 # Read the dataframe
-df = read_shapefile(shp.Reader("./Municipio.shp"))
+df = read_shapefile()
 
 # Precompute the distances
 DISTANCES = {}
@@ -279,9 +322,11 @@ else:
     with open('distances.json', 'w') as f:
         json.dump(DISTANCES, f)
 
+
 # Get the current iteration number
-basepath = './figures'
-counter = max([0] + [int(f.split('\\')[-1].split('.')[0].split('_')[-1]) for f in glob.glob(basepath + "/*.jpg")])
+basepath = './figures/'
+counter = max([0] + [int(f.split('\\')[-1].split('.')[0].split('_')[-1])
+                     for f in glob.glob(basepath + '*')])
 
 # Run the code
 while len(df.owner.unique()) > 1:
@@ -289,6 +334,9 @@ while len(df.owner.unique()) > 1:
     attacks = run()
     counter += len(attacks)
 
+    # Create folder
+    os.mkdir(basepath + str(counter))
+    
     # Plot the map
     fig, ax = plot_map(df, figsize=(15, 12), attack=attacks[-1], fontsize=9)
 
@@ -301,26 +349,24 @@ while len(df.owner.unique()) > 1:
     ax.set_yticks([])
     ax.set_xticks([])
 
-    # Save figure
-    plt.savefig("{}/{}.jpg".format(basepath, counter), dpi=200)
-    print("Saved figure to {}/{}.jpg".format(basepath, counter))
+    # Save post figure
+    figure_name = "{}/{}/{}.jpg".format(basepath, counter, 'post')
+    plt.savefig(figure_name, dpi=200)
+    print("Saved figure to {}".format(figure_name))
     plt.close()
 
-    # Plot the zoomed map
-    x_lim, y_lim = (float("inf"), float("-inf")), (float("inf"), float("-inf"))
-    for city_name in df[(df.owner == attacks[-1]['attack']) | (df.owner == attacks[-1]['defend'])].nome:
-        coord_x, coord_y = get_city_coordinates(df, city_name)
-        x_lim = (min([x_lim[0]] + coord_x), max([x_lim[1]] + coord_x))
-        y_lim = (min([y_lim[0]] + coord_y), max([y_lim[1]] + coord_y))
-    x_lim = (x_lim[0] - 0.02, x_lim[1] + 0.02)
-    y_lim = (y_lim[0] - 0.02, y_lim[1] + 0.02)
+    print("Computing bounds for zoomed image")
+    bounds = df[(df.owner == attacks[-1]['attack']) | (df.owner == attacks[-1]['defend'])].geometry.unary_union.bounds
+    x_lim = (bounds[0] - 0.02, bounds[2] + 0.02)
+    y_lim = (bounds[1] - 0.02, bounds[3] + 0.02)
     fig, ax = plot_map(df,
                        figsize=(15, 12),
                        attack=attacks[-1],
                        fontsize=30,
-                       city_linewidth=4.,
+                       arrow_fontsize=min(x_lim[1] - x_lim[0], y_lim[1] - y_lim[0]) * 200,
                        x_lim=x_lim,
-                       y_lim=y_lim)
+                       y_lim=y_lim,
+                       zoom=True)
 
     # Call Garbage Collector explicitly
     gc.collect()
@@ -332,17 +378,21 @@ while len(df.owner.unique()) > 1:
     ax.set_xticks([])
 
     # Save figure
-    plt.savefig("{}/zoom_{}.jpg".format(basepath, counter), dpi=200)
-    print("Saved figure to {}/zoom_{}.jpg".format(basepath, counter))
+    figure_name = "{}/{}/{}.jpg".format(basepath, counter, 'comment')
+    plt.savefig(figure_name, dpi=200)
+    print("Saved figure to {}".format(figure_name))
     plt.close()
 
     # Call Garbage Collector explicitly
-    gc.collect()
-    
+    gc.collect()    
+
+    # Save post text to file
+    save_text(df, basepath, counter, attacks[-1])
+
     # Update Dataframe JSON file
     print("Saving Updatable Dataframe Information to JSON")
     df[['nome', 'owner', 'protected', 'color', 'ranking']].to_json(
         './guerra.json', orient='records')  # Save to JSON
-    
+
     # Call Garbage Collector explicitly
     gc.collect()
