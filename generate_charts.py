@@ -266,10 +266,10 @@ def save_text(df, basepath, counter, attack):
 
     # Post text
     with open("{}/{}/{}.txt".format(basepath, counter, 'post'), 'w') as f:
-        first_line = f"{np.random.choice(LOCATIONS_FULL) if np.random.randint(100) >= 90 else ''} {attack['attack']} {np.random.choice(CONQUER_VERB) if np.random.randint(100) >= 95 else 'conquista'} {attack['defend_itself']}"
+        first_line = f"{np.random.choice(LOCATIONS_FULL) if np.random.randint(100) >= 60 else ''} {attack['attack']} {np.random.choice(CONQUER_VERB) if np.random.randint(100) >= 75 else 'conquista'} {attack['defend_itself']}"
         
         if attack['defend_itself'] != attack['defend']: # Different defender territory and defender owner
-            first_line += f" {np.random.choice(LOCATIONS) if np.random.randint(100) >= 90 else 'de'} {attack['defend']}"
+            first_line += f" {np.random.choice(LOCATIONS) if np.random.randint(100) >= 70 else 'de'} {attack['defend']}"
         
         if attack['attack_itself'] != attack['attack']: # Different attacker territory and attacker owner
             first_line += f" através de {attack['attack_itself']}"
