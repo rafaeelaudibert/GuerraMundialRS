@@ -260,7 +260,7 @@ def save_text(df, basepath, counter, attack):
         Save the tet for this attack to file
     '''
     LOCATIONS = np.array(['a querência de', 'o território de', 'as terras de', 'todos os bois de'])
-    LOCATIONS_FULL = np.array(['A querência de', 'Os soldados de', 'Os peões de', 'A gurizada de'])
+    LOCATIONS_FULL = np.array(['A querência de', 'O exército de', 'A peonada de', 'A gurizada de'])
     CONQUER_VERB = np.array(['ataca', 'derruba', 'passa por cima de'])
     ELIMINATIONS = np.array(['está fora do jogo', 'foi brutalmente eliminado', 'está fora de combate', 'perdeu todos seus territórios', 'foi eliminado', 'tá fora da peleia'])
 
