@@ -225,22 +225,34 @@ def run(*, times=1):
 
                 cities.append({'attack': attack_city_owner.nome.to_numpy()[0],
                                'defend': defend_city_owner.nome.to_numpy()[0],
+                               'attack_itself': attack_name,
+                               'defend_itself': defend_name,
                                'success': False})
             else:
                 # Print information
                 print("{} conquers {} from {} through {}".format(attack_city_owner.nome.to_numpy()[
                     0], defend_name, defend_city_owner.nome.to_numpy()[0], attack_name))
 
-                # Update the city owner
-                df.loc[df['nome'] == defend_name, ['owner']] = attack_city_owner.nome.to_numpy()[
-                    0]
+                # Update the city owner and color
+                df.loc[df['nome'] == defend_name, ['owner']] = \
+                    attack_city_owner.nome.to_numpy()[0]
+                df.loc[df['nome'] == defend_name, 'color'] = \
+                    attack_city_owner.color.to_numpy()
 
                 cities.append({'attack': attack_city_owner.nome.to_numpy()[0],
                                'defend': defend_city_owner.nome.to_numpy()[0],
+                               'attack_itself': attack_name,
+                               'defend_itself': defend_name,
                                'success': True})
             
+                # Verify if need to update ranking
+                if defend_city_owner.nome.to_numpy()[0] not in list(df.owner):
+                    print('Adding city to ranking')
+                    df.loc[df.nome == defend_city_owner.nome.to_numpy()[0], ['ranking']] = len(df.owner.unique()) + 1
+
             # Decrease protectedness
-            df.loc[df['protected'] > 0, ['protected']] = df[df['protected'] > 0].protected - 1
+            df.loc[df['protected'] > 0, ['protected']
+                   ] = df[df['protected'] > 0].protected - 1
     return cities
 
 
@@ -327,9 +339,10 @@ while len(df.owner.unique()) > 1:
     # Call Garbage Collector explicitly
     gc.collect()
     
-    # Update Dataframe HDF5 file
+    # Update Dataframe JSON file
     print("Saving Updatable Dataframe Information to JSON")
-    df[['nome', 'owner', 'protected']].to_json('./dataframe.json', orient='records') # Save to HDF5
+    df[['nome', 'owner', 'protected', 'color', 'ranking']].to_json(
+        './guerra.json', orient='records')  # Save to JSON
     
     # Call Garbage Collector explicitly
     gc.collect()
