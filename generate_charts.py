@@ -17,6 +17,7 @@ from descartes.patch import PolygonPatch
 from matplotlib.collections import PatchCollection
 from tqdm import tqdm
 
+# Configure SNS
 sns.set(style='white', palette='pastel', color_codes=True)
 sns.mpl.rc('figure', figsize=(10, 6))
 
@@ -44,52 +45,14 @@ def read_shapefile():
     return df
 
 
-def get_city_coordinates(df, city_name):
-    """
-    From a city_name, return its XY coordinates
-    """
-    # Fetch the shape coordinates
-    coords = df[df.nome == city_name].coords.to_numpy()[0]
-    x_lon = [point[0] for point in coords]
-    y_lat = [point[1] for point in coords]
-
-    return x_lon, y_lat
-
-def get_city_centre(df, city_name):
-    """
-    From a city_name, return its center coordinates
-    """
-
-    # Fetch city coordinates
-    coord_x, coord_y = get_city_coordinates(df, city_name)
-
-    # Compute signed area
-    A = 0
-    for i in range(len(coord_x)):
-        A += coord_x[i] * coord_y[(i + 1) % len(coord_y)] - coord_x[(i + 1) % len(coord_x)] * coord_y[i]
-    A /= 2
-
-    # Compute C_x
-    C_x = 0
-    C_y = 0
-    for i in range(len(coord_x)):
-        C_x += (coord_x[i] + coord_x[(i + 1) % len(coord_x)]) * (coord_x[i] * coord_y[(i + 1) % len(coord_y)] - coord_x[(i + 1) % len(coord_x)] * coord_y[i])
-        C_y += (coord_y[i] + coord_y[(i + 1) % len(coord_x)]) * (coord_x[i] * coord_y[(i + 1) % len(coord_y)] - coord_x[(i + 1) % len(coord_x)] * coord_y[i])
-    C_x /= 6 * A
-    C_y /= 6 * A
-
-    # Fetch the shape information
-    return C_x, C_y
-
-
-def haversine_distance(x0, y0, x1, y1):
+def haversine_distance(p0, p1):
     """
     Calculate the great circle distance between two points 
     on the earth (specified in decimal degrees)
     """
 
     # Convert decimal degrees to radians
-    lon1, lat1, lon2, lat2 = map(radians, [x0, y0, x1, y1])
+    lon1, lat1, lon2, lat2 = map(radians, [p0.x, p0.y, p1.x, p1.y])
 
     # Haversine formula
     dlon = lon2 - lon1
@@ -106,65 +69,35 @@ def distance_to_other_cities(df, city):
     Returns the Haversine distance for each city
     in relation to a given city, sorted by distance
     """
-    city_centre = df[df.nome == city].centre.to_numpy()[0]
-    distance = [(haversine_distance(*city_centre, *df[df.nome ==
-                                                      other_city].centre.to_numpy()[0]), other_city,) for other_city in df.nome]
+    city_centre = df[df.nome == city].geometry.centroid
+    distance = [(haversine_distance(city_centre, df[df.nome ==
+                                                    other_city].geometry.centroid), other_city,) for other_city in df.nome]
 
     return sorted(distance, key=lambda x: x[0])
 
-
-def plot_city(df, city_name, color='w', print_text=False, city_linewidth=0.03, **kwargs):
-    """ Plots a single shape """
-
-    # Fetch and plot the shape with its contour
-    x_lon, y_lat = get_city_coordinates(df, city_name)
-    plt.fill(x_lon, y_lat, facecolor=color, zorder=-2)
-    plt.plot(x_lon, y_lat, 'w', linewidth=city_linewidth)
-    
-
-    # Configure the text plotting
-    if print_text:
-        x_center, y_center = get_city_centre(df, city_name)
-        plt.text(x_center, y_center, city_name,
-                 va='center', ha='center', **kwargs)
-
-
-def sizeof_fmt(num, suffix='B'):
-    ''' By Fred Cirera, after https://stackoverflow.com/a/1094933/1870254'''
-
-    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
-        if abs(num) < 1024.0:
-            return "%3.1f%s%s" % (num, unit, suffix)
-        num /= 1024.0
-    return "%.1f%s%s" % (num, 'Yi', suffix)
 
 def plot_arrow(a, b, crossed=False, **kwargs):
     '''
     Plot an arrow from city A to city B
     '''
 
-    start = get_city_centre(df, a)
-    end = get_city_centre(df, b)
+    start = df[df.nome == a].geometry.centroid.to_numpy()[0]
+    end = df[df.nome == b].geometry.centroid.to_numpy()[0]
 
-    x = start[0]
-    y = start[1]
-    dx = end[0] - x
-    dy = end[1] - y
+    x, y = start.x, start.y
+    dx, dy = end.x - x, end.y - y
 
     # Draw an 'X' in the arrow, if crossed
     if crossed:
-        plt.text(x + dx/2, y + dy/2, 'X', va='center', ha='center', fontsize=8) \
+        plt.text(x + dx/2, y + dy/2 - 0.002, 'X', va='center', ha='center', zorder=120, fontsize=kwargs.get('arrow_fontsize', 7)) \
            .set_path_effects([PathEffects.withStroke(linewidth=2, foreground='w')])
 
-    return plt.arrow(x, y,
-                     (dx - 0.007) if dx > 0 else (dx + 0.007),
-                     (dy - 0.007) if dy > 0 else (dy + 0.007),
-                     width=0.005,
-                     head_length=0.02,
-                     color='k',
-                     **kwargs)
+    return plt.arrow(x, y, dx, dy, width=0.005, head_length=0.02, zorder=119, color='k')
+                     # (dx - 0.007) if dx > 0 else (dx + 0.007)
+                     # (dy - 0.007) if dy > 0 else (dy + 0.007)
 
-def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, city_linewidth=0.03, **kwargs):
+
+def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack=None, city_linewidth=0.03, zoom=False, **kwargs):
     '''
     Plot map with lim coordinates, and the cities asked with their correspondent color
     '''
@@ -172,13 +105,11 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, city_l
     # Configure the plot
     fig, ax = plt.subplots(figsize=figsize)
 
-    # Plot the cities
-    for owner_name in df.owner.unique():
-        owner = df[df['nome'] == owner_name].iloc[0]
-        owned_by = df[df['owner'] == owner_name]
-        for index, row in owned_by.iterrows():
-            plot_city(df, row.nome, owner.color, city_linewidth=city_linewidth, **kwargs)
-    gc.collect() # Call Garbage Collector explicitly
+    # Plot the cities (using custom code, as the fucking geopandas doesn't work correctly)
+    ax.set_aspect('equal')
+    collection = PatchCollection([PolygonPatch(poly['geometry'], facecolor=poly['color'], hatch='//') for (i, poly) in df.iterrows()], match_original=True)
+    ax.add_collection(collection, autolim=True)
+    ax.autoscale_view()
 
     # Configure the map size
     if (x_lim != None) and (y_lim != None):
@@ -187,7 +118,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, city_l
 
     # Plot texts
     owners = df.owner.unique()
-    np.random.shuffle(owners) # Shuffle in place
+    np.random.shuffle(owners)  # Shuffle in place
 
     # Predefined first owners (always plotted, if alive)
     ALWAYS_ON_TOP = ['Porto Alegre',
@@ -201,16 +132,26 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, city_l
     texts_bb = []
     for owner_name in owners:
         owned_by = df[df['owner'] == owner_name]
-        x_center, y_center = np.mean(
-            [get_city_centre(df, owned_by_name) for owned_by_name in owned_by.nome], 0)
-        txt = plt.text(x_center, y_center, owner_name,
-                    va='center', ha='center', **kwargs)
+        center = df[df.owner == owner_name].geometry.unary_union.centroid
+        txt = plt.text(center.x, center.y, owner_name,
+                       va='center', ha='center', zorder=130 if x_lim is not None else 110, fontsize=kwargs.get('fontsize', 6))
         txt.set_path_effects(
             [PathEffects.withStroke(linewidth=3, foreground='w')])
-        bb_transformed = txt.get_window_extent(renderer = fig.canvas.get_renderer()) \
+        bb_transformed = txt.get_window_extent(renderer=fig.canvas.get_renderer()) \
                             .transformed(ax.transData.inverted())
         
-        # Tests interesction
+        # Check if it is outside of the map
+        outside = False
+        if (x_lim != None) and (y_lim != None):
+            if bb_transformed.xmin < x_lim[0] or \
+                bb_transformed.xmax > x_lim[1] or \
+                bb_transformed.ymin < y_lim[0] or \
+                bb_transformed.ymax > y_lim[1]:
+                    txt.remove()
+                    outside = True
+
+        # Tests interesction if not already outside
+        if not outside:
         for bb in texts_bb:
             if bb.overlaps(bb_transformed):
                 txt.remove()
@@ -221,10 +162,26 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack = None, city_l
     # Plot arrow for attack
     arrow = None
     if attack != None:
-        arrow = plot_arrow(attack['attack'], attack['defend'], crossed=not attack['success'], alpha=0.8, zorder=100)
+        arrow = plot_arrow(attack['attack'], attack['defend_itself'],
+                           crossed=not attack['success'], alpha=0.8, zorder=100, **kwargs)
 
+        # Add borders to attack city, and defend city
+        collection = PatchCollection([PolygonPatch(df[df.nome == attack['defend_itself']].geometry.to_numpy()[0], fill=None, zorder=200, edgecolor='blue', linewidth=10 if zoom else 2)], match_original=True)
+        ax.add_collection(collection, autolim=True)
+
+        collection = PatchCollection([PolygonPatch(df[df.owner == attack['attack']].geometry.unary_union, fill=None, zorder=200, edgecolor='red', linewidth=5 if zoom else 1.5)], match_original=True)
+        ax.add_collection(collection, autolim=True)
+        
+        if len(df[df.owner == attack['defend']]) > 0:
+            collection = PatchCollection([PolygonPatch(df[df.owner == attack['defend']].geometry.unary_union, fill=None, zorder=200, edgecolor='green', linewidth=3 if zoom else 1)], match_original=True)
+            ax.add_collection(collection, autolim=True)
+
+        
+
+        ax.autoscale_view()
 
     return fig, ax
+
 
 def run(*, times=1):
     '''
