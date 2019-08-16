@@ -1,16 +1,21 @@
+# Core imports
+import gc
+import glob
+import json
+import os
+from math import asin, cos, radians, sin, sqrt
+from pprint import pprint as pp
+
+# Library imports
+import geopandas
+import matplotlib.patheffects as PathEffects
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import shapefile as shp
-import matplotlib.pyplot as plt
-import matplotlib.patheffects as PathEffects
 import seaborn as sns
+from descartes.patch import PolygonPatch
+from matplotlib.collections import PatchCollection
 from tqdm import tqdm
-from math import radians, cos, sin, asin, sqrt
-import os
-import json
-import gc
-from pprint import pprint as pp
-import glob
 
 sns.set(style='white', palette='pastel', color_codes=True)
 sns.mpl.rc('figure', figsize=(10, 6))
