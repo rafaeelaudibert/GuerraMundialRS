@@ -247,7 +247,6 @@ def run(*, times=1):
 
                 # Verify if need to update ranking
                 if defend_city_owner.nome.to_numpy()[0] not in list(df.owner):
-                    print('Adding city to ranking')
                     df.loc[df.nome == defend_city_owner.nome.to_numpy()[0], ['ranking']] = len(df.owner.unique()) + 1
 
             # Decrease protectedness
