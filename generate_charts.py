@@ -346,13 +346,22 @@ while len(df.owner.unique()) > 1:
     sns.despine(top=True, right=True, left=True, bottom=True)
     fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
     ax.set_yticks([])
-    ax.set_xticks([])
+    ax.set_xticks([])    
+
+    # Add background image
+    print("Adding image as background")
+    img = plt.imread('background.png')
+    ax.imshow(img, extent=[*(ax.get_xlim()), *(ax.get_ylim())], zorder=-100)
 
     # Save post figure
     figure_name = "{}/{}/{}.jpg".format(basepath, counter, 'post')
     plt.savefig(figure_name, dpi=200)
     print("Saved figure to {}".format(figure_name))
+    del img, fig, ax
     plt.close()
+
+    # Call Garbage Collector explicitly
+    gc.collect()
 
     print("Computing bounds for zoomed image")
     bounds = df[(df.owner == attacks[-1]['attack']) | (df.owner == attacks[-1]['defend'])].geometry.unary_union.bounds
