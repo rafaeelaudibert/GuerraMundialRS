@@ -93,8 +93,6 @@ def plot_arrow(a, b, crossed=False, **kwargs):
            .set_path_effects([PathEffects.withStroke(linewidth=2, foreground='w')])
 
     return plt.arrow(x, y, dx, dy, width=0.005, head_length=0.02, zorder=119, color='k')
-                     # (dx - 0.007) if dx > 0 else (dx + 0.007)
-                     # (dy - 0.007) if dy > 0 else (dy + 0.007)
 
 
 def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_linewidth=0.03, zoom=False, **kwargs):
@@ -112,7 +110,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
     ax.autoscale_view()
 
     # Configure the map size
-    if (x_lim != None) and (y_lim != None):
+    if x_lim is not None and y_lim is not None:
         plt.xlim(x_lim)
         plt.ylim(y_lim)
 
@@ -143,13 +141,13 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
 
         # Check if it is outside of the map
         outside = False
-        if (x_lim != None) and (y_lim != None):
+        if (x_lim is not None) and (y_lim is not None):
             if bb_transformed.xmin < x_lim[0] or \
-                bb_transformed.xmax > x_lim[1] or \
-                bb_transformed.ymin < y_lim[0] or \
-                bb_transformed.ymax > y_lim[1]:
-                    txt.remove()
-                    outside = True
+                    bb_transformed.xmax > x_lim[1] or \
+                    bb_transformed.ymin < y_lim[0] or \
+                    bb_transformed.ymax > y_lim[1]:
+                txt.remove()
+                outside = True
 
         # Tests interesction if not already outside
         if not outside:
@@ -172,7 +170,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
 
         collection = PatchCollection([PolygonPatch(df[df.owner == attack['attack']].geometry.unary_union, fill=None, zorder=200, edgecolor='red', linewidth=5 if zoom else 1.5)], match_original=True)
         ax.add_collection(collection, autolim=True)
-        
+
         if len(df[df.owner == attack['defend']]) > 0:
             collection = PatchCollection([PolygonPatch(df[df.owner == attack['defend']].geometry.unary_union, fill=None, zorder=200, edgecolor='green', linewidth=3 if zoom else 1)], match_original=True)
             ax.add_collection(collection, autolim=True)
@@ -253,6 +251,7 @@ def run(*, times=1):
                    ] = df[df['protected'] > 0].protected - 1
     return cities
 
+
 def save_text(df, basepath, counter, attacks):
     '''
         Save the tet for this attack to file
@@ -267,26 +266,26 @@ def save_text(df, basepath, counter, attacks):
         first_line, second_line, third_line = '', '', ''
         for attack in attacks:
             first_line += f"{np.random.choice(LOCATIONS_FULL) + ' ' if np.random.randint(100) >= 60 else ''}{attack['attack']} {np.random.choice(CONQUER_VERB) if np.random.randint(100) >= 75 else 'conquista'} {attack['defend_itself']}"
-        
-        if attack['defend_itself'] != attack['defend']: # Different defender territory and defender owner
-            first_line += f" {np.random.choice(LOCATIONS) if np.random.randint(100) >= 70 else 'de'} {attack['defend']}"
-        
-        if attack['attack_itself'] != attack['attack']: # Different attacker territory and attacker owner
-                first_line += f", através de {attack['attack_itself']}"
-        
-        first_line += '!\n'
 
-        defend_territories = len(df[df.owner == attack['defend']])
+            if attack['defend_itself'] != attack['defend']:  # Different defender territory and defender owner
+                first_line += f" {np.random.choice(LOCATIONS) if np.random.randint(100) >= 70 else 'de'} {attack['defend']}"
+
+            if attack['attack_itself'] != attack['attack']:  # Different attacker territory and attacker owner
+                first_line += f", através de {attack['attack_itself']}"
+
+            first_line += '!\n'
+
+            defend_territories = len(df[df.owner == attack['defend']])
             second_line += f"{attack['defend']} passa a ter {defend_territories} território{'s' if defend_territories > 1 else ''}.\n" if defend_territories > 0 else f"{attack['defend']} {np.random.choice(ELIMINATIONS)}.\n"
 
-        attack_territories = len(df[df.owner == attack['attack']])
+            attack_territories = len(df[df.owner == attack['attack']])
             third_line += f"{attack['attack']} conquista seu {attack_territories}º território.\n"
 
         fourth_line = f"Ainda restam {len(df.owner.unique())} cidades."
 
         text = first_line + '\n' + second_line + '\n' + third_line + '\n\n' + fourth_line
         f.write(text)
-    
+
     # Comment text (ranking)
     with open("{}/{}/{}.txt".format(basepath, counter, 'comment'), 'w') as f:
         text = 'Cidades já eliminadas:\n\n'
@@ -294,12 +293,11 @@ def save_text(df, basepath, counter, attacks):
         for name, position in cities:
             text += f"{int(position)}. {name}\n"
         f.write(text)
-        
+
     return
 
+# CHART GENERATION
 
-
-### CHART GENERATION ###
 
 # Read the dataframe
 df = read_shapefile()
@@ -331,12 +329,12 @@ counter = max([0] + [int(f.split('\\')[-1].split('.')[0].split('_')[-1])
 # Run the code
 while len(df.owner.unique()) > 1:
     # Run the attacks
-    attacks = run()
+    attacks = run(times=2)
     counter += len(attacks)
 
     # Create folder
     os.mkdir(basepath + str(counter))
-    
+
     # Plot the map
     fig, ax = plot_map(df, figsize=(15, 12), attacks=attacks, fontsize=9)
 
@@ -347,7 +345,7 @@ while len(df.owner.unique()) > 1:
     sns.despine(top=True, right=True, left=True, bottom=True)
     fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
     ax.set_yticks([])
-    ax.set_xticks([])    
+    ax.set_xticks([])
 
     # Add background image
     print("Adding image as background")
@@ -364,41 +362,42 @@ while len(df.owner.unique()) > 1:
     # Call Garbage Collector explicitly
     gc.collect()
 
-    
     for idx, attack in enumerate(attacks):
-        print("Computing bounds for zoomed attack {}/{}".format(idx + 1, len(attacks)))
         bounds = df[(df.owner == attack['attack']) | (df.owner == attack['defend'])].geometry.unary_union.bounds
-    x_lim = (bounds[0] - 0.02, bounds[2] + 0.02)
-    y_lim = (bounds[1] - 0.02, bounds[3] + 0.02)
+        x_lim = (bounds[0] - 0.02, bounds[2] + 0.02)
+        y_lim = (bounds[1] - 0.02, bounds[3] + 0.02)
 
-        print("Plotting its chart")
-    fig, ax = plot_map(df,
-                       figsize=(15, 12),
-                        attacks=[attack],
-                       fontsize=30,
-                       arrow_fontsize=min(x_lim[1] - x_lim[0], y_lim[1] - y_lim[0]) * 200,
-                       x_lim=x_lim,
-                       y_lim=y_lim,
-                       zoom=True)
+        print("Plotting zoomed chart {}/{}".format(idx + 1, len(attacks)))
+        fig, ax = plot_map(df,
+                           figsize=(15, 12),
+                           attacks=[attack],
+                           fontsize=30,
+                           arrow_fontsize=min(x_lim[1] - x_lim[0], y_lim[1] - y_lim[0]) * 200,
+                           x_lim=x_lim,
+                           y_lim=y_lim,
+                           zoom=True)
 
-    # Call Garbage Collector explicitly
-    gc.collect()
+        # Call Garbage Collector explicitly
+        gc.collect()
 
-    # Remove axis, ticks and remove padding
-    sns.despine(top=True, right=True, left=True, bottom=True)
-    fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
-    ax.set_yticks([])
-    ax.set_xticks([])
+        # Remove axis, ticks and remove padding
+        sns.despine(top=True, right=True, left=True, bottom=True)
+        fig.subplots_adjust(left=0, bottom=0, right=1,
+                            top=1, wspace=0, hspace=0)
+        ax.set_yticks([])
+        ax.set_xticks([])
 
-    # Save figure
+        # Save figure
         print("Saving figure...")
-        figure_name = "{}/{}/{}.jpg".format(basepath, counter, 'comment_{}'.format(idx + 1))
-    plt.savefig(figure_name, dpi=200)
-    print("Saved figure to {}".format(figure_name))
-    plt.close()
+        figure_name = "{}/{}/{}.jpg".format(basepath,
+                                            counter,
+                                            'comment_{}'.format(idx + 1))
+        plt.savefig(figure_name, dpi=200)
+        print("Saved figure to {}".format(figure_name))
+        plt.close()
 
-    # Call Garbage Collector explicitly
-    gc.collect()    
+        # Call Garbage Collector explicitly
+        gc.collect()
 
     # Save post and comment text to file
     save_text(df, basepath, counter, attacks)
