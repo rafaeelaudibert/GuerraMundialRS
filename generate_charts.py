@@ -270,7 +270,7 @@ def save_text(df, basepath, counter, attacks):
             if attack['attack_itself'] != attack['attack']:  # Different attacker territory and attacker owner
                 first_line += f", através de {attack['attack_itself']}"
 
-            first_line += '!\n'
+            first_line += '\n'
 
             defend_territories = len(df[df.owner == attack['defend']])
             second_line += f"{attack['defend']} passa a ter {defend_territories} território{'s' if defend_territories > 1 else ''}.\n" if defend_territories > 0 else f"{attack['defend']} {np.random.choice(ELIMINATIONS)}.\n"
