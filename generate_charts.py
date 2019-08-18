@@ -27,11 +27,11 @@ def read_shapefile():
     Read a shapefile into a Geopandas dataframe
     """
 
-    print("Generating Dataframe")
+    print("Generating Geopandas Dataframe")
     df = geopandas.read_file('./Municipio.shp')
 
     if os.path.isfile('./guerra.json'):  # If already ran, update the fields
-        print("Reading owner, color and protected from JSON file")
+        print("Reading special parameters from saved JSON file")
         json_df = pd.read_json('./guerra.json', orient='records')
         df[['owner', 'color', 'protected', 'ranking', 'participated']] = json_df[[
             'owner', 'color', 'protected', 'ranking', 'participated']]
@@ -109,6 +109,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
     collection = PatchCollection([PolygonPatch(poly['geometry'], facecolor=poly['color'] if poly['participated'] else [np.mean(poly['color'])] * 3, hatch='//') for (i, poly) in df.iterrows()], match_original=True)
     ax.add_collection(collection, autolim=True)
     ax.autoscale_view()
+    print("Plotted cities")
 
     # Configure the map size
     if x_lim is not None and y_lim is not None:
@@ -158,6 +159,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
                     break
             else:
                 texts_bb.append(bb_transformed)
+    print("Plotted text")
 
     # Plot arrow for attack
     for attack in attacks:
@@ -177,6 +179,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
             ax.add_collection(collection, autolim=True)
 
         ax.autoscale_view()
+    print("Plotted arrow(s)")
 
     return fig, ax
 
@@ -305,6 +308,7 @@ if os.path.isfile('./distances.json'):
     print("Fetching distances from cached file")
     with open('./distances.json', 'r') as f:
         DISTANCES = json.load(f)
+    print("Distances fetched")
 else:
     print("Computing distances")
     with tqdm(df['nome']) as t:
@@ -328,12 +332,14 @@ while len(df.owner.unique()) > 1:
     # Run the attacks
     attacks = run(times=2)
     counter += len(attacks)
+    print("We are at attack {}".format(counter))
 
     # Create folder
     os.mkdir(basepath + str(counter))
 
     # Plot the map
     fig, ax = plot_map(df, figsize=(15, 12), attacks=attacks, fontsize=9)
+    print("Plotted big map")
 
     # Call Garbage Collector explicitly
     gc.collect()
@@ -345,11 +351,11 @@ while len(df.owner.unique()) > 1:
     ax.set_xticks([])
 
     # Add background image
-    print("Adding image as background")
     img = plt.imread('background.png')
     ax.imshow(img, extent=[*(ax.get_xlim()), *(ax.get_ylim())], zorder=-100)
 
     # Save post figure
+    print("Saving figure...")
     figure_name = "{}/{}/{}.jpg".format(basepath, counter, 'post')
     plt.savefig(figure_name, dpi=200)
     print("Saved figure to {}".format(figure_name))
@@ -359,6 +365,7 @@ while len(df.owner.unique()) > 1:
     # Call Garbage Collector explicitly
     gc.collect()
 
+    print("Starting to plot attacks zoomed map")
     for idx, attack in enumerate(attacks):
         bounds = df[(df.owner == attack['attack']) | (df.owner == attack['defend'])].geometry.unary_union.bounds
         x_lim = (bounds[0] - 0.02, bounds[2] + 0.02)
