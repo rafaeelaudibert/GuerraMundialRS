@@ -97,7 +97,7 @@ def plot_arrow(a, b, crossed=False, **kwargs):
                      # (dy - 0.007) if dy > 0 else (dy + 0.007)
 
 
-def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack=None, city_linewidth=0.03, zoom=False, **kwargs):
+def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_linewidth=0.03, zoom=False, **kwargs):
     '''
     Plot map with lim coordinates, and the cities asked with their correspondent color
     '''
@@ -121,10 +121,11 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack=None, city_lin
     np.random.shuffle(owners)  # Shuffle in place
 
     # Predefined first owners (always plotted, if alive)
-    ALWAYS_ON_TOP = ['Porto Alegre',
-                     attack['attack'] if attack is not None else '',
-                     attack['defend'] if attack is not None else '']
-
+    ALWAYS_ON_TOP = [
+                        'Porto Alegre',
+                        *[attack['attack'] for attack in attacks],
+                        *[attack['defend'] for attack in attacks]
+                    ]
     for city in ALWAYS_ON_TOP:
         if city in owners:
             owners = np.concatenate(([city], owners))
@@ -161,7 +162,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack=None, city_lin
 
     # Plot arrow for attack
     arrow = None
-    if attack != None:
+    for attack in attacks:
         arrow = plot_arrow(attack['attack'], attack['defend_itself'],
                            crossed=not attack['success'], alpha=0.8, zorder=100, **kwargs)
 
@@ -176,8 +177,6 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attack=None, city_lin
             collection = PatchCollection([PolygonPatch(df[df.owner == attack['defend']].geometry.unary_union, fill=None, zorder=200, edgecolor='green', linewidth=3 if zoom else 1)], match_original=True)
             ax.add_collection(collection, autolim=True)
 
-        
-        
         ax.autoscale_view()
 
     return fig, ax
@@ -254,36 +253,38 @@ def run(*, times=1):
                    ] = df[df['protected'] > 0].protected - 1
     return cities
 
-def save_text(df, basepath, counter, attack):
+def save_text(df, basepath, counter, attacks):
     '''
         Save the tet for this attack to file
     '''
-    LOCATIONS = np.array(['a querência de', 'o território de', 'as terras de', 'todos os bois de'])
+    LOCATIONS = np.array(['da querência de', 'do território de', ', pertencente às terras de', 'da gurizada de'])
     LOCATIONS_FULL = np.array(['A querência de', 'O exército de', 'A peonada de', 'A gurizada de'])
     CONQUER_VERB = np.array(['ataca', 'derruba', 'passa por cima de'])
     ELIMINATIONS = np.array(['está fora do jogo', 'foi brutalmente eliminado', 'está fora de combate', 'perdeu todos seus territórios', 'foi eliminado', 'tá fora da peleia'])
 
     # Post text
     with open("{}/{}/{}.txt".format(basepath, counter, 'post'), 'w') as f:
-        first_line = f"{np.random.choice(LOCATIONS_FULL) if np.random.randint(100) >= 60 else ''} {attack['attack']} {np.random.choice(CONQUER_VERB) if np.random.randint(100) >= 75 else 'conquista'} {attack['defend_itself']}"
+        first_line, second_line, third_line = '', '', ''
+        for attack in attacks:
+            first_line += f"{np.random.choice(LOCATIONS_FULL) + ' ' if np.random.randint(100) >= 60 else ''}{attack['attack']} {np.random.choice(CONQUER_VERB) if np.random.randint(100) >= 75 else 'conquista'} {attack['defend_itself']}"
         
         if attack['defend_itself'] != attack['defend']: # Different defender territory and defender owner
             first_line += f" {np.random.choice(LOCATIONS) if np.random.randint(100) >= 70 else 'de'} {attack['defend']}"
         
         if attack['attack_itself'] != attack['attack']: # Different attacker territory and attacker owner
-            first_line += f" através de {attack['attack_itself']}"
+                first_line += f", através de {attack['attack_itself']}"
         
         first_line += '!\n'
 
         defend_territories = len(df[df.owner == attack['defend']])
-        second_line = f"{attack['defend']} agora possui {defend_territories} territórios.\n" if defend_territories > 0 else f"{attack['defend']} {np.random.choice(ELIMINATIONS)}.\n"
+            second_line += f"{attack['defend']} passa a ter {defend_territories} território{'s' if defend_territories > 1 else ''}.\n" if defend_territories > 0 else f"{attack['defend']} {np.random.choice(ELIMINATIONS)}.\n"
 
         attack_territories = len(df[df.owner == attack['attack']])
-        third_line = f"{attack['attack']} agora possui {attack_territories} territórios.\n"
+            third_line += f"{attack['attack']} conquista seu {attack_territories}º território.\n"
 
         fourth_line = f"Ainda restam {len(df.owner.unique())} cidades."
 
-        text = first_line + second_line + third_line + '\n\n' + fourth_line
+        text = first_line + '\n' + second_line + '\n' + third_line + '\n\n' + fourth_line
         f.write(text)
     
     # Comment text (ranking)
@@ -337,7 +338,7 @@ while len(df.owner.unique()) > 1:
     os.mkdir(basepath + str(counter))
     
     # Plot the map
-    fig, ax = plot_map(df, figsize=(15, 12), attack=attacks[-1], fontsize=9)
+    fig, ax = plot_map(df, figsize=(15, 12), attacks=attacks, fontsize=9)
 
     # Call Garbage Collector explicitly
     gc.collect()
@@ -363,13 +364,17 @@ while len(df.owner.unique()) > 1:
     # Call Garbage Collector explicitly
     gc.collect()
 
-    print("Computing bounds for zoomed image")
-    bounds = df[(df.owner == attacks[-1]['attack']) | (df.owner == attacks[-1]['defend'])].geometry.unary_union.bounds
+    
+    for idx, attack in enumerate(attacks):
+        print("Computing bounds for zoomed attack {}/{}".format(idx + 1, len(attacks)))
+        bounds = df[(df.owner == attack['attack']) | (df.owner == attack['defend'])].geometry.unary_union.bounds
     x_lim = (bounds[0] - 0.02, bounds[2] + 0.02)
     y_lim = (bounds[1] - 0.02, bounds[3] + 0.02)
+
+        print("Plotting its chart")
     fig, ax = plot_map(df,
                        figsize=(15, 12),
-                       attack=attacks[-1],
+                        attacks=[attack],
                        fontsize=30,
                        arrow_fontsize=min(x_lim[1] - x_lim[0], y_lim[1] - y_lim[0]) * 200,
                        x_lim=x_lim,
@@ -386,7 +391,8 @@ while len(df.owner.unique()) > 1:
     ax.set_xticks([])
 
     # Save figure
-    figure_name = "{}/{}/{}.jpg".format(basepath, counter, 'comment')
+        print("Saving figure...")
+        figure_name = "{}/{}/{}.jpg".format(basepath, counter, 'comment_{}'.format(idx + 1))
     plt.savefig(figure_name, dpi=200)
     print("Saved figure to {}".format(figure_name))
     plt.close()
@@ -394,8 +400,8 @@ while len(df.owner.unique()) > 1:
     # Call Garbage Collector explicitly
     gc.collect()    
 
-    # Save post text to file
-    save_text(df, basepath, counter, attacks[-1])
+    # Save post and comment text to file
+    save_text(df, basepath, counter, attacks)
 
     # Update Dataframe JSON file
     print("Saving Updatable Dataframe Information to JSON")
