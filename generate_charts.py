@@ -33,14 +33,15 @@ def read_shapefile():
     if os.path.isfile('./guerra.json'):  # If already ran, update the fields
         print("Reading owner, color and protected from JSON file")
         json_df = pd.read_json('./guerra.json', orient='records')
-        df[['owner', 'color', 'protected', 'ranking']] = json_df[[
-            'owner', 'color', 'protected', 'ranking']]
+        df[['owner', 'color', 'protected', 'ranking', 'participated']] = json_df[[
+            'owner', 'color', 'protected', 'ranking', 'participated']]
     else:  # Create new fields
-        print("Configuring owner, color and protected")
+        print("Configuring special parameters")
         df['owner'] = df.nome
         df['color'] = [np.random.rand(3,) / 2 + 0.5 for city_name in df.nome]
         df['protected'] = [0 for city_name in df['nome']]
         df['ranking'] = float('nan')
+        df['participated'] = False
 
     return df
 
@@ -105,7 +106,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
 
     # Plot the cities (using custom code, as the fucking geopandas doesn't work correctly)
     ax.set_aspect('equal')
-    collection = PatchCollection([PolygonPatch(poly['geometry'], facecolor=poly['color'], hatch='//') for (i, poly) in df.iterrows()], match_original=True)
+    collection = PatchCollection([PolygonPatch(poly['geometry'], facecolor=poly['color'] if poly['participated'] else [np.mean(poly['color'])] * 3, hatch='//') for (i, poly) in df.iterrows()], match_original=True)
     ax.add_collection(collection, autolim=True)
     ax.autoscale_view()
 
@@ -227,11 +228,10 @@ def run(*, times=1):
                 # Print information
                 print("{} conquers {} from {} through {}".format(attack_city_owner.nome.values[0], defend_name, defend_city_owner.nome.values[0], attack_name))
 
-                # Update the city owner and color
-                df.loc[df['nome'] == defend_name, ['owner']] = \
-                    attack_city_owner.nome.values[0]
-                df.loc[df['nome'] == defend_name, 'color'] = \
-                    attack_city_owner.color.values
+                # Update the city owner, color and participation
+                df.loc[df['nome'] == defend_name, ['owner']] = attack_city_owner.nome.values[0]
+                df.loc[df['nome'] == defend_name, 'color'] = attack_city_owner.color.values
+                df.loc[(df['nome'] == defend_name) | (df['nome'] == attack_name), 'participated'] = True
 
                 cities.append({'attack': attack_city_owner.nome.values[0],
                                'defend': defend_city_owner.nome.values[0],
@@ -401,7 +401,7 @@ while len(df.owner.unique()) > 1:
 
     # Update Dataframe JSON file
     print("Saving Updatable Dataframe Information to JSON")
-    df[['nome', 'owner', 'protected', 'color', 'ranking']].to_json(
+    df[['nome', 'owner', 'color', 'protected', 'ranking', 'participated']].to_json(
         './guerra.json', orient='records')  # Save to JSON
 
     # Call Garbage Collector explicitly
