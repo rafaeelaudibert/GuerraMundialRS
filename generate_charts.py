@@ -81,8 +81,8 @@ def plot_arrow(a, b, crossed=False, **kwargs):
     Plot an arrow from city A to city B
     '''
 
-    start = df[df.nome == a].geometry.centroid.to_numpy()[0]
-    end = df[df.nome == b].geometry.centroid.to_numpy()[0]
+    start = df[df.nome == a].geometry.centroid.values[0]
+    end = df[df.nome == b].geometry.centroid.values[0]
 
     x, y = start.x, start.y
     dx, dy = end.x - x, end.y - y
@@ -159,18 +159,18 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
                 texts_bb.append(bb_transformed)
 
     # Plot arrow for attack
-    arrow = None
     for attack in attacks:
-        arrow = plot_arrow(attack['attack'], attack['defend_itself'],
-                           crossed=not attack['success'], alpha=0.8, zorder=100, **kwargs)
+        plot_arrow(attack['attack'], attack['defend_itself'],
+                   crossed=not attack['success'], alpha=0.8, zorder=100, **kwargs)
 
         # Add borders to attack city, and defend city
-        collection = PatchCollection([PolygonPatch(df[df.nome == attack['defend_itself']].geometry.to_numpy()[0], fill=None, zorder=200, edgecolor='blue', linewidth=10 if zoom else 2)], match_original=True)
+        collection = PatchCollection([PolygonPatch(df[df.nome == attack['defend_itself']].geometry.values[0], fill=None, zorder=200, edgecolor='blue', linewidth=10 if zoom else 2)], match_original=True)
         ax.add_collection(collection, autolim=True)
 
         collection = PatchCollection([PolygonPatch(df[df.owner == attack['attack']].geometry.unary_union, fill=None, zorder=200, edgecolor='red', linewidth=5 if zoom else 1.5)], match_original=True)
         ax.add_collection(collection, autolim=True)
 
+        # Add borders to defend city owner if it still has territories
         if len(df[df.owner == attack['defend']]) > 0:
             collection = PatchCollection([PolygonPatch(df[df.owner == attack['defend']].geometry.unary_union, fill=None, zorder=200, edgecolor='green', linewidth=3 if zoom else 1)], match_original=True)
             ax.add_collection(collection, autolim=True)
@@ -192,17 +192,16 @@ def run(*, times=1):
             attack_city = df.sample()
 
             # Get the reference to the attacking city owner
-            attack_city_owner = df[df.nome == attack_city.owner.to_numpy()[0]]
+            attack_city_owner = df[df.nome == attack_city.owner.values[0]]
 
             # Get the attacking city name
-            attack_name = attack_city.nome.to_numpy()[0]
+            attack_name = attack_city.nome.values[0]
 
             # Get the distance to the other cities
             distance_to_cities = DISTANCES[attack_name]
 
             # Get the names from all cities under the same owner
-            owned_by_same = df[df.owner == attack_city_owner.nome.to_numpy()[
-                0]].nome.to_numpy()
+            owned_by_same = df[df.owner == attack_city_owner.nome.values[0]].nome.values
 
             # Get the name of the first city, in distance, which is not owned by the same guy
             defend_name = next(
@@ -212,39 +211,37 @@ def run(*, times=1):
             defend_city = df[df.nome == defend_name]
 
             # Get its owner
-            defend_city_owner = df[df.nome == defend_city.owner.to_numpy()[0]]
+            defend_city_owner = df[df.nome == defend_city.owner.values[0]]
 
             # Check city protection
-            if defend_city.protected.to_numpy()[0] > 0:
+            if defend_city.protected.values[0] > 0:
                 # Print information
-                print("{} tried to conquer {} from {} through {}, but failed".format(attack_city_owner.nome.to_numpy()[
-                    0], defend_name, defend_city_owner.nome.to_numpy()[0], attack_name))
+                print("{} tried to conquer {} from {} through {}, but failed".format(attack_city_owner.nome.values[0], defend_name, defend_city_owner.nome.values[0], attack_name))
 
-                cities.append({'attack': attack_city_owner.nome.to_numpy()[0],
-                               'defend': defend_city_owner.nome.to_numpy()[0],
+                cities.append({'attack': attack_city_owner.nome.values[0],
+                               'defend': defend_city_owner.nome.values[0],
                                'attack_itself': attack_name,
                                'defend_itself': defend_name,
                                'success': False})
             else:
                 # Print information
-                print("{} conquers {} from {} through {}".format(attack_city_owner.nome.to_numpy()[
-                    0], defend_name, defend_city_owner.nome.to_numpy()[0], attack_name))
+                print("{} conquers {} from {} through {}".format(attack_city_owner.nome.values[0], defend_name, defend_city_owner.nome.values[0], attack_name))
 
                 # Update the city owner and color
                 df.loc[df['nome'] == defend_name, ['owner']] = \
-                    attack_city_owner.nome.to_numpy()[0]
+                    attack_city_owner.nome.values[0]
                 df.loc[df['nome'] == defend_name, 'color'] = \
-                    attack_city_owner.color.to_numpy()
+                    attack_city_owner.color.values
 
-                cities.append({'attack': attack_city_owner.nome.to_numpy()[0],
-                               'defend': defend_city_owner.nome.to_numpy()[0],
+                cities.append({'attack': attack_city_owner.nome.values[0],
+                               'defend': defend_city_owner.nome.values[0],
                                'attack_itself': attack_name,
                                'defend_itself': defend_name,
                                'success': True})
 
                 # Verify if need to update ranking
-                if defend_city_owner.nome.to_numpy()[0] not in list(df.owner):
-                    df.loc[df.nome == defend_city_owner.nome.to_numpy()[0], ['ranking']] = len(df.owner.unique()) + 1
+                if defend_city_owner.nome.values[0] not in list(df.owner):
+                    df.loc[df.nome == defend_city_owner.nome.values[0], ['ranking']] = len(df.owner.unique()) + 1
 
             # Decrease protectedness
             df.loc[df['protected'] > 0, ['protected']
