@@ -1,5 +1,6 @@
 # Guerra Mundial RS 2020
 
-Repository with a notebook trying to develop an app to support a WorldWarBot-like bot with Rio Grande do Sul's cities
+WorldWarBot-like bot with [Rio Grande do Sul](https://en.wikipedia.org/wiki/Rio_Grande_do_Sul)'s cities
 
-_Work in Progres_
+- [x] Code
+- [ ] Documentation
