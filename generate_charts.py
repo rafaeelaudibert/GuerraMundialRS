@@ -10,6 +10,7 @@ from pprint import pprint as pp
 import geopandas
 import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -77,7 +78,7 @@ def distance_to_other_cities(df, city):
     return sorted(distance, key=lambda x: x[0])
 
 
-def plot_arrow(a, b, crossed=False, **kwargs):
+def plot_arrow(a, b, ax, crossed=False, **kwargs):
     '''
     Plot an arrow from city A to city B
     '''
@@ -90,19 +91,20 @@ def plot_arrow(a, b, crossed=False, **kwargs):
 
     # Draw an 'X' in the arrow, if crossed
     if crossed:
-        plt.text(x + dx/2, y + dy/2 - 0.002, 'X', va='center', ha='center', zorder=120, fontsize=kwargs.get('arrow_fontsize', 7)) \
+        ax.text(x + dx/2, y + dy/2 - 0.002, 'X', va='center', ha='center', zorder=120, fontsize=kwargs.get('arrow_fontsize', 7)) \
            .set_path_effects([PathEffects.withStroke(linewidth=2, foreground='w')])
 
-    return plt.arrow(x, y, dx, dy, width=0.005, head_length=0.02, zorder=119, color='k')
+    return ax.arrow(x, y, dx, dy, width=0.005, head_length=0.02, zorder=119, color='k')
 
 
-def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_linewidth=0.03, zoom=False, **kwargs):
+def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_linewidth=0.03, zoom=False, ax=None, fig=None, **kwargs):
     '''
     Plot map with lim coordinates, and the cities asked with their correspondent color
     '''
 
     # Configure the plot
-    fig, ax = plt.subplots(figsize=figsize)
+    if ax is None or fig is None:
+        fig, ax = plt.subplots(figsize=figsize)
 
     # Plot the cities (using custom code, as the fucking geopandas doesn't work correctly)
     ax.set_aspect('equal')
@@ -113,8 +115,8 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
 
     # Configure the map size
     if x_lim is not None and y_lim is not None:
-        plt.xlim(x_lim)
-        plt.ylim(y_lim)
+        ax.set_xlim(x_lim)
+        ax.set_ylim(y_lim)
 
     # Plot texts
     owners = df.owner.unique()
@@ -134,7 +136,7 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
     for owner_name in owners:
         owned_by = df[df['owner'] == owner_name]
         center = df[df.owner == owner_name].geometry.unary_union.centroid
-        txt = plt.text(center.x, center.y, owner_name,
+        txt = ax.text(center.x, center.y, owner_name,
                        va='center', ha='center', zorder=130 if x_lim is not None else 110, fontsize=kwargs.get('fontsize', 6))
         txt.set_path_effects(
             [PathEffects.withStroke(linewidth=3, foreground='w')])
@@ -163,23 +165,23 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
 
     # Plot arrow for attack
     for attack in attacks:
-        plot_arrow(attack['attack'], attack['defend_itself'],
+        plot_arrow(attack['attack_itself'], attack['defend_itself'], ax,
                    crossed=not attack['success'], alpha=0.8, zorder=100, **kwargs)
 
         # Add borders to attack city, and defend city
-        collection = PatchCollection([PolygonPatch(df[df.nome == attack['defend_itself']].geometry.values[0], fill=None, zorder=200, edgecolor='blue', linewidth=10 if zoom else 2)], match_original=True)
+        collection = PatchCollection([PolygonPatch(df[df.nome == attack['defend_itself']].geometry.values[0], fill=None, zorder=200, edgecolor='blue', linewidth=5 if zoom else 2)], match_original=True)
         ax.add_collection(collection, autolim=True)
 
-        collection = PatchCollection([PolygonPatch(df[df.owner == attack['attack']].geometry.unary_union, fill=None, zorder=200, edgecolor='red', linewidth=5 if zoom else 1.5)], match_original=True)
+        collection = PatchCollection([PolygonPatch(df[df.owner == attack['attack']].geometry.unary_union, fill=None, zorder=200, edgecolor='red', linewidth=2.5 if zoom else 1.5)], match_original=True)
         ax.add_collection(collection, autolim=True)
 
         # Add borders to defend city owner if it still has territories
         if len(df[df.owner == attack['defend']]) > 0:
-            collection = PatchCollection([PolygonPatch(df[df.owner == attack['defend']].geometry.unary_union, fill=None, zorder=200, edgecolor='green', linewidth=3 if zoom else 1)], match_original=True)
+            collection = PatchCollection([PolygonPatch(df[df.owner == attack['defend']].geometry.unary_union, fill=None, zorder=200, edgecolor='green', linewidth=1.5 if zoom else 1)], match_original=True)
             ax.add_collection(collection, autolim=True)
 
         ax.autoscale_view()
-    print("Plotted arrow(s)")
+    print("Plotted arrows")
 
     return fig, ax
 
@@ -334,9 +336,10 @@ counter = max([0] + [int(f.split('\\')[-1].split('.')[0].split('_')[-1])
                      for f in glob.glob(basepath + '*')])
 
 # Run the code
+ATTACK_NUMBER = 3
 while len(df.owner.unique()) > 1:
     # Run the attacks
-    attacks = run(times=2)
+    attacks = run(times=ATTACK_NUMBER)
     counter += len(attacks)
     print("We are at attack {}".format(counter))
 
@@ -372,6 +375,7 @@ while len(df.owner.unique()) > 1:
     gc.collect()
 
     print("Starting to plot attacks zoomed map")
+    fig_axs, axs = plt.subplots(ncols=ATTACK_NUMBER)
     for idx, attack in enumerate(attacks):
         bounds = df[(df.owner == attack['attack']) | (df.owner == attack['defend'])].geometry.unary_union.bounds
         x_lim = (bounds[0] - 0.02, bounds[2] + 0.02)
@@ -381,11 +385,13 @@ while len(df.owner.unique()) > 1:
         fig, ax = plot_map(df,
                            figsize=(15, 12),
                            attacks=[attack],
-                           fontsize=30,
-                           arrow_fontsize=min(x_lim[1] - x_lim[0], y_lim[1] - y_lim[0]) * 200,
+                           fontsize=15,
+                           arrow_fontsize=min(x_lim[1] - x_lim[0], y_lim[1] - y_lim[0]) * 75,
                            x_lim=x_lim,
                            y_lim=y_lim,
-                           zoom=True)
+                           zoom=True,
+                           ax=axs[idx],
+                           fig=fig_axs)
 
         # Call Garbage Collector explicitly
         gc.collect()
@@ -393,21 +399,19 @@ while len(df.owner.unique()) > 1:
         # Remove axis, ticks and remove padding
         sns.despine(top=True, right=True, left=True, bottom=True)
         fig.subplots_adjust(left=0, bottom=0, right=1,
-                            top=1, wspace=0, hspace=0)
+                            top=1, wspace=0.1, hspace=0)
         ax.set_yticks([])
         ax.set_xticks([])
 
-        # Save figure
-        print("Saving figure...")
-        figure_name = "{}/{}/{}.jpg".format(basepath,
-                                            counter,
-                                            'comment_{}'.format(idx + 1))
-        plt.savefig(figure_name, dpi=200)
-        print("Saved figure to {}".format(figure_name))
-        plt.close()
+    # Save figure
+    print("Saving figure...")
+    figure_name = "{}/{}/{}.jpg".format(basepath, counter, 'comment')
+    plt.savefig(figure_name, dpi=200)
+    print("Saved figure to {}".format(figure_name))
+    plt.close()
 
-        # Call Garbage Collector explicitly
-        gc.collect()
+    # Call Garbage Collector explicitly
+    gc.collect()
 
     # Save post and comment text to file
     save_text(df, basepath, counter, attacks)
@@ -421,3 +425,7 @@ while len(df.owner.unique()) > 1:
 
     # Call Garbage Collector explicitly
     gc.collect()
+
+
+# PAREI NO 99 DE POSTAR
+# PAREI NO 54 DE COMENTAR
