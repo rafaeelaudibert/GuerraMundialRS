@@ -260,10 +260,15 @@ def save_text(df, basepath, counter, attacks):
     LOCATIONS_FULL = np.array(['A querência de', 'O exército de', 'A peonada de', 'A gurizada de'])
     CONQUER_VERB = np.array(['ataca', 'derruba', 'passa por cima de'])
     ELIMINATIONS = np.array(['está fora do jogo', 'foi brutalmente eliminado', 'está fora de combate', 'perdeu todos seus territórios', 'foi eliminado', 'tá fora da peleia'])
+    MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
     # Post text
     with open("{}/{}/{}.txt".format(basepath, counter, 'post'), 'w') as f:
-        first_line, second_line, third_line = '', '', ''
+        introduction, first_line, second_line, third_line = '', '', '', ''
+
+        attacks_quantity = len(glob.glob(basepath + '*')) - 1 # Quantity of attacks
+        introduction = "{} de {}.".format(MONTHS[attacks_quantity % 12], str(int(attacks_quantity / 12) + 2020))
+        
         for attack in attacks:
             first_line += f"{np.random.choice(LOCATIONS_FULL) + ' ' if np.random.randint(100) >= 60 else ''}{attack['attack']} {np.random.choice(CONQUER_VERB) if np.random.randint(100) >= 75 else 'conquista'} {attack['defend_itself']}"
 
@@ -283,15 +288,16 @@ def save_text(df, basepath, counter, attacks):
 
         fourth_line = f"Ainda restam {len(df.owner.unique())} cidades."
 
-        text = first_line + '\n' + second_line + '\n' + third_line + '\n\n' + fourth_line
+        text = introduction + '\n' + first_line + '\n' + second_line + '\n' + third_line + '\n\n' + fourth_line
         f.write(text)
 
     # Comment text (ranking)
     with open("{}/{}/{}.txt".format(basepath, counter, 'comment'), 'w') as f:
-        text = 'Cidades já eliminadas:\n\n'
-        cities = sorted([(city.nome, city.ranking) for idx, city in df[df.ranking.notnull()].iterrows()], key=lambda x: x[1])
-        for name, position in cities:
-            text += f"{int(position)}. {name}\n"
+        text = 'Cidades com maiores territórios:\n\n'
+        owner_counts = df[(df.participated == True)].owner.value_counts().head(10)
+        for idx, (owner, count) in enumerate(owner_counts.iteritems()):
+            if count >= 1:
+                text += f"{idx + 1}. {owner} -> {count} território{'s' if count > 1 else ''}\n"
         f.write(text)
 
     return
