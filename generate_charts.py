@@ -416,6 +416,8 @@ while len(df.owner.unique()) > 1:
     print("Saving Updatable Dataframe Information to JSON")
     df[['nome', 'owner', 'color', 'protected', 'ranking', 'participated']].to_json(
         './guerra.json', orient='records')  # Save to JSON
+    df[['nome', 'owner', 'color', 'protected', 'ranking', 'participated']].to_json(
+        './json/guerra.{}.json'.format(counter), orient='records')  # Save to JSON
 
     # Call Garbage Collector explicitly
     gc.collect()
