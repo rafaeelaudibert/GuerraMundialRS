@@ -233,7 +233,7 @@ def run(*, times=1):
 
                 # Update the city owner, color and participation
                 df.loc[df['nome'] == defend_name, ['owner']] = attack_city_owner.nome.values[0]
-                df.loc[df['nome'] == defend_name, 'color'] = attack_city_owner.color.values
+                df.loc[df['nome'] == defend_name, ['color']] = attack_city.color.values
                 df.loc[(df['nome'] == defend_name) | (df['nome'] == attack_name), 'participated'] = True
 
                 cities.append({'attack': attack_city_owner.nome.values[0],
