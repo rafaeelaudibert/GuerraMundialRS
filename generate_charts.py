@@ -122,6 +122,10 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
     owners = df.owner.unique()
     np.random.shuffle(owners)  # Shuffle in place
 
+    # Choose what names to plot, based if we are zoomed in or not
+    if zoom: # Only plot zoomed to cities names, assuming there is one attack to zoom at
+        plot_names = [owner_name for owner_name in [attacks[0]['attack'], attacks[0]['defend']] if owner_name in owners]
+    else:
     # Predefined first owners (always plotted, if alive)
     ALWAYS_ON_TOP = [
                         'Porto Alegre',
@@ -131,6 +135,8 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
     for city in ALWAYS_ON_TOP:
         if city in owners:
             owners = np.concatenate(([city], owners))
+
+        plot_names = owners
 
     texts_bb = []
     for owner_name in owners:
