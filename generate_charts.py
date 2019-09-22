@@ -126,20 +126,20 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
     if zoom: # Only plot zoomed to cities names, assuming there is one attack to zoom at
         plot_names = [owner_name for owner_name in [attacks[0]['attack'], attacks[0]['defend']] if owner_name in owners]
     else:
-    # Predefined first owners (always plotted, if alive)
-    ALWAYS_ON_TOP = [
-                        'Porto Alegre',
-                        *[attack['attack'] for attack in attacks],
-                        *[attack['defend'] for attack in attacks]
-                    ]
-    for city in ALWAYS_ON_TOP:
-        if city in owners:
-            owners = np.concatenate(([city], owners))
-
+        # Predefined first owners (always plotted, if alive)
+        ALWAYS_ON_TOP = [
+                            'Porto Alegre',
+                            *[attack['attack'] for attack in attacks],
+                            *[attack['defend'] for attack in attacks]
+                        ]
+        for city in ALWAYS_ON_TOP:
+            if city in owners:
+                owners = np.concatenate(([city], owners))
+        
         plot_names = owners
 
     texts_bb = []
-    for owner_name in owners:
+    for owner_name in plot_names:
         owned_by = df[df['owner'] == owner_name]
         center = df[df.owner == owner_name].geometry.unary_union.centroid
         txt = ax.text(center.x, center.y, owner_name,
@@ -175,10 +175,10 @@ def plot_map(df, x_lim=None, y_lim=None, figsize=(16, 13), attacks=[], city_line
                    crossed=not attack['success'], alpha=0.8, zorder=100, **kwargs)
 
         # Add borders to attack city, and defend city
-        collection = PatchCollection([PolygonPatch(df[df.nome == attack['defend_itself']].geometry.values[0], fill=None, zorder=200, edgecolor='blue', linewidth=5 if zoom else 2)], match_original=True)
+        collection = PatchCollection([PolygonPatch(df[df.nome == attack['defend_itself']].geometry.values[0], fill=None, zorder=200, edgecolor='blue', linewidth=2.5 if zoom else 2)], match_original=True)
         ax.add_collection(collection, autolim=True)
 
-        collection = PatchCollection([PolygonPatch(df[df.owner == attack['attack']].geometry.unary_union, fill=None, zorder=200, edgecolor='red', linewidth=2.5 if zoom else 1.5)], match_original=True)
+        collection = PatchCollection([PolygonPatch(df[df.owner == attack['attack']].geometry.unary_union, fill=None, zorder=200, edgecolor='red', linewidth=2 if zoom else 1.5)], match_original=True)
         ax.add_collection(collection, autolim=True)
 
         # Add borders to defend city owner if it still has territories
@@ -272,11 +272,12 @@ def save_text(df, basepath, counter, attacks):
 
     # Post text
     with open("{}/{}/{}.txt".format(basepath, counter, 'post'), 'w') as f:
-        introduction, first_line, second_line, third_line = '', '', '', ''
+        introduction, first_line, second_line, third_line, fourth_line = '', '', '', '', ''
 
         attacks_quantity = len(glob.glob(basepath + '*')) - 1 # Quantity of attacks
         introduction = "{} de {}.".format(MONTHS[attacks_quantity % 12], str(int(attacks_quantity / 12) + 2020))
-        
+
+        wins_losses = {}
         for attack in attacks:
             first_line += f"{np.random.choice(LOCATIONS_FULL) + ' ' if np.random.randint(100) >= 60 else ''}{attack['attack']} {np.random.choice(CONQUER_VERB) if np.random.randint(100) >= 75 else 'conquista'} {attack['defend_itself']}"
 
@@ -288,15 +289,23 @@ def save_text(df, basepath, counter, attacks):
 
             first_line += '\n'
 
-            defend_territories = len(df[df.owner == attack['defend']])
-            second_line += f"{attack['defend']} passa a ter {defend_territories} território{'s' if defend_territories > 1 else ''}.\n" if defend_territories > 0 else f"{attack['defend']} {np.random.choice(ELIMINATIONS)}.\n"
+            wins_losses[attack['defend']] = wins_losses.get(attack['defend'], 0) - 1
+            wins_losses[attack['attack']] = wins_losses.get(attack['attack'], 0) + 1
 
-            attack_territories = len(df[df.owner == attack['attack']])
-            third_line += f"{attack['attack']} conquista seu {attack_territories}º território.\n"
+        for city, val in wins_losses.items():
+            territories = len(df[df.owner == city])
+            if val == 0:
+                fourth_line += f"{city} permanece com {territories} territórios.\n"
+            elif val == 1:
+                third_line += f"{city} conquista seu {territories}º território.\n"
+            elif val > 1:
+                third_line += f"{city} conquista seus {'º, '.join([str(territories - i) for i in range(val - 1, 0, -1)])}º e {territories}º territórios.\n"
+            else: # val < 0
+                second_line += f"{city} passa a ter {territories} território{'s' if territories > 1 else ''}.\n" if territories > 0 else f"{city} {np.random.choice(ELIMINATIONS)}.\n"
 
-        fourth_line = f"Ainda restam {len(df.owner.unique())} cidades."
+        fifth_line = f"Ainda restam {len(df.owner.unique())} cidades."
 
-        text = introduction + '\n' + first_line + '\n' + second_line + '\n' + third_line + '\n\n' + fourth_line
+        text = introduction + '\n' + first_line + '\n' + second_line + '\n' + third_line + '\n' + fourth_line + '\n\n' + fifth_line
         f.write(text)
 
     # Comment text (ranking)
@@ -342,7 +351,7 @@ counter = max([0] + [int(f.split('\\')[-1].split('.')[0].split('_')[-1])
                      for f in glob.glob(basepath + '*')])
 
 # Run the code
-ATTACK_NUMBER = 3
+ATTACK_NUMBER = 4
 while len(df.owner.unique()) > 1:
     # Run the attacks
     attacks = run(times=ATTACK_NUMBER)
@@ -431,7 +440,3 @@ while len(df.owner.unique()) > 1:
 
     # Call Garbage Collector explicitly
     gc.collect()
-
-
-# PAREI NO 99 DE POSTAR
-# PAREI NO 54 DE COMENTAR
