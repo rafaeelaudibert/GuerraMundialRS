@@ -3,7 +3,7 @@ import gc
 import glob
 import json
 import os
-from math import asin, cos, radians, sin, sqrt
+from math import asin, cos, radians, sin, sqrt, floor, ceil
 from pprint import pprint as pp
 
 # Library imports
@@ -381,7 +381,7 @@ while len(df.owner.unique()) > 1:
     # Save post figure
     print("Saving figure...")
     figure_name = "{}/{}/{}.jpg".format(basepath, counter, 'post')
-    plt.savefig(figure_name, dpi=200)
+    plt.savefig(figure_name, dpi=100)
     print("Saved figure to {}".format(figure_name))
     del img, fig, ax
     plt.close()
@@ -390,7 +390,8 @@ while len(df.owner.unique()) > 1:
     gc.collect()
 
     print("Starting to plot attacks zoomed map")
-    fig_axs, axs = plt.subplots(ncols=ATTACK_NUMBER)
+    fig_axs, axs = plt.subplots(ncols=floor(sqrt(ATTACK_NUMBER)), nrows=ceil(sqrt(ATTACK_NUMBER)))
+    axs = axs.flatten()
     for idx, attack in enumerate(attacks):
         bounds = df[(df.owner == attack['attack']) | (df.owner == attack['defend'])].geometry.unary_union.bounds
         x_lim = (bounds[0] - 0.02, bounds[2] + 0.02)
